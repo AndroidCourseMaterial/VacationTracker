@@ -2,7 +2,12 @@ package edu.rosehulman.vacationtracker;
 
 import android.app.Dialog;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.os.Bundle;
+import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
@@ -12,6 +17,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.Toast;
 import android.widget.ToggleButton;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -21,9 +27,13 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 
+import java.io.IOException;
+import java.util.List;
+
 public class
 MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
+    private static final int RC_PERMISSIONS = 1;
     private GoogleMap mMap;
 
     @Override
@@ -56,7 +66,34 @@ MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
         mMap.addMarker(new MarkerOptions().position(terreHaute).title("Terre Haute"));
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(terreHaute, 5.0f));
+        mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
+
+        mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
+            @Override
+            public void onMapLongClick(LatLng latLng) {
+                createMarker(latLng);
+            }
+        });
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            mMap.setMyLocationEnabled(true);
+        } else {
+            Toast.makeText(MainActivity.this, "No location permission", Toast.LENGTH_SHORT).show();
+            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, RC_PERMISSIONS);
+        }
+
     }
+
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == RC_PERMISSIONS) {
+            try {
+                mMap.setMyLocationEnabled(true);
+            } catch (SecurityException se) {
+                Toast.makeText(MainActivity.this, "Don't have security permission to add location", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -92,7 +129,7 @@ MainActivity extends AppCompatActivity implements OnMapReadyCallback {
                 String snippet = editTextSnippet.getText().toString();
 
                 // TODO: Add a marker at that location.
-
+                mMap.addMarker(new MarkerOptions().position(latLng).title(title).snippet(snippet));
             }
         });
         builder.create().show();
@@ -118,7 +155,15 @@ MainActivity extends AppCompatActivity implements OnMapReadyCallback {
     }
 
     private void goToPlace(String locationName, float zoomLevel) {
-        // TODO: find this place using the GeoCoder and go there.
-
+        // DONE: find this place using the GeoCoder and go there.
+        Geocoder geocoder = new Geocoder(this);
+        List<Address> addresses = null;
+        try {
+            addresses = geocoder.getFromLocationName(locationName, 1);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        LatLng placeLocation = new LatLng(addresses.get(0).getLatitude(), addresses.get(0).getLongitude());
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(placeLocation, zoomLevel));
     }
 }
