@@ -4,14 +4,17 @@ import android.app.Dialog;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Address;
 import android.location.Geocoder;
 import android.os.Bundle;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.DialogFragment;
+import android.support.v4.graphics.ColorUtils;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -26,6 +29,8 @@ import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polygon;
+import com.google.android.gms.maps.model.PolygonOptions;
 
 import java.io.IOException;
 import java.util.List;
@@ -35,6 +40,8 @@ MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
     private static final int RC_PERMISSIONS = 1;
     private GoogleMap mMap;
+
+    List<StateBoundary> mStateBoundaries;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,6 +53,8 @@ MainActivity extends AppCompatActivity implements OnMapReadyCallback {
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+        mStateBoundaries = Utils.getStateBoundaries(this);
     }
 
     /**
@@ -66,7 +75,7 @@ MainActivity extends AppCompatActivity implements OnMapReadyCallback {
 
         mMap.addMarker(new MarkerOptions().position(terreHaute).title("Terre Haute"));
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(terreHaute, 5.0f));
-        mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
+        //mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
 
         mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
             @Override
@@ -81,7 +90,32 @@ MainActivity extends AppCompatActivity implements OnMapReadyCallback {
             Toast.makeText(MainActivity.this, "No location permission", Toast.LENGTH_SHORT).show();
             ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, RC_PERMISSIONS);
         }
+        // Add state boundaries
+        for (StateBoundary sb : mStateBoundaries) {
+            int fillColor = sb.getColor();
 
+            int alpha = 10; // Make almost transparent (hidden) for now.
+            fillColor = ColorUtils.setAlphaComponent(fillColor, alpha);
+
+            mMap.addPolygon(new PolygonOptions()
+                    .addAll(sb.getVertices())
+                    .fillColor(fillColor)
+                    .strokeWidth(1.0f)
+                    .clickable(true));
+        }
+
+        mMap.setOnPolygonClickListener(new GoogleMap.OnPolygonClickListener() {
+            @Override
+            public void onPolygonClick(Polygon polygon) {
+                int fillColor = polygon.getFillColor();
+                Log.d(Constants.TAG, String.format("Before toggle: %x", fillColor));
+                // Toggle alpha on/off. But doesn't store in model.
+                int alpha = Color.alpha(fillColor) > 10 ? 10 : 95;
+                fillColor = ColorUtils.setAlphaComponent(fillColor, alpha);
+                Log.d(Constants.TAG, String.format("After toggle: %x", fillColor));
+                polygon.setFillColor(fillColor);
+            }
+        });
     }
 
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
